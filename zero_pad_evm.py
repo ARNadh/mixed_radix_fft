@@ -4,31 +4,25 @@ import matplotlib.pyplot as plt
 from scipy.stats import gmean
 
 
-def generate_multitone_sequence(size, sample_rate=48000, num_components=1000, noise_level=0.01):
-    """Generate a noisy multitone sequence with random frequencies and amplitudes using a default seed."""
-
-    # Set the random seed for reproducibility
-    seed = 1
+def generate_multitone_sequence(size, sample_rate=48000, num_components=5, noise_level=0.01, seed=None):
+    """Generate a noisy multitone sequence with random frequencies and amplitudes."""
+    if seed is None:
+        seed = 42  # Default seed if not provided
     np.random.seed(seed)
 
     t = np.arange(size) / sample_rate  # Time vector
+    frequencies = np.random.uniform(20, 20000, num_components)  # Random frequencies between 20 Hz and 20 kHz
+    amplitudes = np.random.uniform(0.1, 1.0, num_components)  # Random amplitudes between 0.1 and 1.0
 
-    # Generate random frequencies between 20 Hz and 20 kHz
-    frequencies = np.random.uniform(20, 20000, num_components)
-
-    # Generate random amplitudes between 0.1 and 1.0
-    amplitudes = np.random.uniform(0.1, 1.0, num_components)
-
-    # Initialize the signal
-    signal = np.zeros(size, dtype=float)
-
-    # Sum the sinusoids for each frequency and amplitude
+    signal = np.zeros(size, dtype=float)  # Initialize signal as a real array
     for f, a in zip(frequencies, amplitudes):
         signal += a * np.cos(2 * np.pi * f * t)
 
-    # Add Gaussian noise to the signal
-    noise = noise_level * np.random.randn(size)
+    noise = noise_level * np.random.randn(size)  # Add Gaussian noise
     signal += noise
+
+    # Normalize the signal to be within the range [-0.5, 0.5]
+    signal = (signal - np.min(signal)) / (np.max(signal) - np.min(signal)) - 0.5
 
     return signal
 
@@ -57,7 +51,7 @@ def compute_evm(original_magnitude, downsampled_magnitude):
 
     # Calculate Pnoise using geometric mean
     squared_error = np.square(original_magnitude - downsampled_magnitude)
-    Pnoise = gmean(squared_error)  # Use geometric mean for Pnoise
+    Pnoise = np.sqrt(np.mean(squared_error))  # Use geometric mean for Pnoise
 
     # Calculate Psignal using GM
     Psignal = np.mean(np.square(original_magnitude))
