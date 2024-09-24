@@ -45,16 +45,18 @@ def compute_rmse(original_magnitude, downsampled_magnitude):
     return np.sqrt(np.mean(squared_error)) * 100
 
 
-def compute_evm(original_magnitude, downsampled_magnitude):
-    """Compute the EVM (dB) based on the RMSE and original signal power using geometric mean for Pnoise."""
-    #rmse = compute_rmse(original_magnitude, downsampled_magnitude)
+def compute_evm(original_fft, downsampled_fft):
+    """Compute the EVM (dB) based on the complex FFT difference and signal power."""
 
-    # Calculate Pnoise using geometric mean
-    squared_error = np.square(original_magnitude - downsampled_magnitude)
-    Pnoise = np.sqrt(np.mean(squared_error))  # Use geometric mean for Pnoise
+    # Calculate the difference between original and downsampled FFTs (complex difference)
+    fft_difference = original_fft - downsampled_fft
 
-    # Calculate Psignal using GM
-    Psignal = np.mean(np.square(original_magnitude))
+    # Take the absolute value (magnitude) of the difference
+    Pnoise = np.mean(np.square(np.abs(fft_difference)))
+
+    # Calculate Psignal (mean of squared original magnitudes)
+    Psignal = np.mean(np.square(np.abs(original_fft)))
+
     print("Psignal:", Psignal)
 
     # Calculate EVM in dB
@@ -63,8 +65,12 @@ def compute_evm(original_magnitude, downsampled_magnitude):
     return evm_db
 
 
-def plot_fft_comparison(original_magnitude, downsampled_magnitude, method, size):
+def plot_fft_comparison(original_fft, downsampled_fft, method, size):
     """Plot the comparison between original and downsampled FFT results with x-axis from 0 to 2*pi and y-axis in log scale."""
+
+    # Compute the magnitude of the original and downsampled FFTs
+    original_magnitude = np.abs(original_fft)
+    downsampled_magnitude = np.abs(downsampled_fft)
 
     # Generate the x-axis representing angles from 0 to 2*pi
     t = np.linspace(0, 2 * np.pi, len(original_magnitude))  # Phase from 0 to 2*pi
@@ -95,23 +101,23 @@ def plot_fft_comparison(original_magnitude, downsampled_magnitude, method, size)
 def process_fft_for_size(size, interpolation_methods, noise_level):
     """Process FFT for a given size and all interpolation methods, returning the EVM (dB)."""
     sequence = generate_multitone_sequence(size, noise_level=noise_level)
-    fft_result = np.fft.fft(sequence)
+
+    # Use np.fft.fft with norm="forward" to automatically handle normalization
+    fft_result = np.fft.fft(sequence, norm="forward")  # Original complex FFT
     nearest_power_of_2 = 2 ** int(np.ceil(np.log2(size)))
     padded_sequence = zero_pad_sequence(sequence, nearest_power_of_2)
-    padded_fft_result = np.fft.fft(padded_sequence)
-
-    original_magnitude = np.abs(fft_result)
-    #original_magnitude = np.abs(fft_result) / np.max(np.abs(fft_result))
-    #original_magnitude = np.abs(sequence)
+    padded_fft_result = np.fft.fft(padded_sequence, norm="forward")  # Padded complex FFT with normalization
 
     evm_results = {}
     downsampled_results = {}
+
     for method in interpolation_methods:
-        downsampled_fft_result = downsample_fft(padded_fft_result, size, method)
-        downsampled_magnitude = np.abs(downsampled_fft_result) / np.max(np.abs(downsampled_fft_result))
-        evm = compute_evm(original_magnitude, downsampled_magnitude)
+        downsampled_fft_result = downsample_fft(padded_fft_result, size, method)  # Downsampled complex FFT
+
+        # Pass the complex FFT results to compute_evm
+        evm = compute_evm(fft_result, downsampled_fft_result)
         evm_results[method] = evm
-        downsampled_results[method] = downsampled_magnitude
+        downsampled_results[method] = downsampled_fft_result
 
     return sequence, evm_results, fft_result, downsampled_results
 
@@ -131,17 +137,6 @@ def plot_input_signal(sequence, sample_rate=48000):
     plt.tight_layout()
     plt.show()
 
-def plot_fft_result(magnitude, title):
-    """Plot the FFT result magnitude."""
-    plt.figure(figsize=(14, 6))
-    plt.plot(magnitude, label='Magnitude')
-    plt.title(title)
-    plt.xlabel('Frequency Bin')
-    plt.ylabel('Magnitude')
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
 
 def plot_evm_results(sizes, evm_results, interpolation_methods):
     """Plot EVM (dB) results for all interpolation methods."""
@@ -182,15 +177,14 @@ def main():
     first_sequence = None
 
     for size in sizes:
-        sequence, evm_results[size], fft_result, downsampled_results = process_fft_for_size(size, interpolation_methods, noise_level)
+        sequence, evm_results[size], fft_result, downsampled_results = process_fft_for_size(size, interpolation_methods,
+                                                                                            noise_level)
         if first_sequence is None:
             first_sequence = sequence
 
     if size == 1200:
-        original_magnitude = np.abs(fft_result) / np.max(np.abs(fft_result))
         for method in interpolation_methods:
-            downsampled_magnitude = downsampled_results[method]
-            plot_fft_comparison(original_magnitude, downsampled_magnitude, method, size)
+            plot_fft_comparison(fft_result, downsampled_results[method], method, size)
 
     # Plot the input signal
     plot_input_signal(first_sequence)
@@ -199,6 +193,5 @@ def main():
     plot_evm_results(sizes, evm_results, interpolation_methods)
 
 
-# Run the main function
 if __name__ == "__main__":
     main()

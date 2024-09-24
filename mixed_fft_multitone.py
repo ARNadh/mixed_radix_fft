@@ -42,13 +42,13 @@ def recursive_mixed_radix_fft(x, W_dict):
     else:
         W_N = W_dict[N]
 
-        # Factor N into radices
         radices = factor_N(N)
         radix = radices[0]  # Use the first radix
         N1 = N // radix
 
         # Split the input into radix sub-arrays using stride
         x_split = [x[r::radix] for r in range(radix)]
+        #print(x_split)
 
         # Recursively compute the FFT of each sub-array
         X_split = [recursive_mixed_radix_fft(sub_x, W_dict) for sub_x in x_split]
@@ -68,7 +68,7 @@ def recursive_mixed_radix_fft(x, W_dict):
 def generate_multitone_sequence(size, sample_rate=48000, num_components=5, noise_level=0.01, seed=None):
     """Generate a noisy multitone sequence with random frequencies and amplitudes."""
     if seed is None:
-        seed = 42  # Default seed if not provided
+        seed = 1  # Default seed if not provided
     np.random.seed(seed)
 
     t = np.arange(size) / sample_rate  # Time vector
@@ -92,12 +92,22 @@ def compute_rmse(original_magnitude, downsampled_magnitude):
     """Compute the Root Mean Squared Error (RMSE) between original and downsampled magnitudes."""
     return np.sqrt(np.mean(np.square(original_magnitude - downsampled_magnitude)))
 
-def compute_evm(original_magnitude, downsampled_magnitude):
-    """Compute the EVM (in dB) based on the geometric mean and original signal power."""
-    squared_error = np.square(original_magnitude - downsampled_magnitude)
-    Pnoise = np.sqrt(np.mean(squared_error))  # Use geometric mean for Pnoise
-    Psignal = np.mean(np.square(original_magnitude))  # Compute Psignal
-    evm_db = 10 * np.log10(Pnoise / Psignal)  # EVM in dB
+
+def compute_evm(original_fft, custom_fft):
+    """Compute the EVM (in dB) based on the complex FFT difference and original signal power."""
+
+    # Calculate the difference between original and custom FFTs (complex difference)
+    fft_difference = original_fft - custom_fft
+
+    # Take the absolute value (magnitude) of the difference
+    Pnoise = np.mean(np.square(np.abs(fft_difference)))
+
+    # Calculate Psignal (mean of squared original magnitudes)
+    Psignal = np.mean(np.square(np.abs(original_fft)))
+
+    # Calculate EVM in dB
+    evm_db = 10 * np.log10(Pnoise / Psignal)
+
     return evm_db
 
 def check_accuracy_recursive(N, W_dict):
@@ -108,11 +118,14 @@ def check_accuracy_recursive(N, W_dict):
     # mixed-radix custom FFT
     X_custom = recursive_mixed_radix_fft(x, W_dict)
 
+    #Normalizing implementation
+    X_custom /= N
+
     # numpy FFT
-    X_numpy = np.fft.fft(x)
+    X_numpy = np.fft.fft(x, norm="forward")
 
     # Compute EVM
-    evm = compute_evm(np.abs(X_numpy), np.abs(X_custom))
+    evm = compute_evm(X_numpy, X_custom)
 
     return evm  # Return the number of unique twiddle factors for N and EVM value
 
