@@ -100,7 +100,7 @@ def compute_evm(original_fft, custom_fft):
     fft_difference = original_fft - custom_fft
 
     # Take the absolute value (magnitude) of the difference
-    Pnoise = np.mean(np.square(np.abs(fft_difference)))
+    Pnoise = np.sqrt(np.mean(np.square(np.abs(fft_difference))))
 
     # Calculate Psignal (mean of squared original magnitudes)
     Psignal = np.mean(np.square(np.abs(original_fft)))
@@ -152,12 +152,13 @@ if __name__ == "__main__":
 
 
     # Plotting the EVM values for different sizes with proper x-axis labels
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(14, 10))
     plt.plot(sizes, evm_values, marker='o', linestyle='-', color='b')
+    plt.xscale('log')
     plt.title('EVM (dB) vs FFT Length')
     plt.xlabel('FFT Length (N)')
     plt.ylabel('EVM (dB)')
-    plt.xticks(sizes, rotation=45)  # Rotate x-axis labels for better readability
-    plt.grid(True)
-    plt.tight_layout()  # Adjust the plot layout to make space for rotated x-labels
+    plt.xticks(sizes, labels=sizes,rotation=90)  # Rotate x-axis labels for better readability
+    plt.grid(True, which="both")
+    #plt.tight_layout()  # Adjust the plot layout to make space for rotated x-labels
     plt.show()
